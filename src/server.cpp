@@ -1,4 +1,5 @@
 #include "../include/server.h"
+#include "../include/ldapParser.h"
 
 Server::Server()
 {
@@ -37,6 +38,7 @@ void Server::parseArguments(int args, char* argv[])
                 this->port = atoi(optarg);
                 break;
             case 'f':
+                this->checkExistenceOfFile(optarg);
                 this->file = optarg;
                 break;
             default:
@@ -51,12 +53,14 @@ int Server::run()
     // pak asi predelat ========================================
     int newsocket;
     int len, msgSize, i;
-    char buffer[BUFFER];
+    char buffer;
     pid_t pid; long p;      // process ID number (PID)
     struct sigaction sa;    // a signal action when CHILD process is finished
 
 
     sa.sa_handler = SIG_IGN; // ignore signals - no specific action when SIG_CHILD received
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
     // When SIGCHLD received, no action required
     if (sigaction(SIGCHLD, &sa, NULL) == -1)
     {
@@ -69,6 +73,7 @@ int Server::run()
     socket.createSocket();
 
     struct sockaddr_in6 server;
+    // memset(&server, 0, sizeof(server));
     struct sockaddr_in client;
 
     server.sin6_family = AF_INET6;
@@ -104,47 +109,52 @@ int Server::run()
         // child process that will handle an incoming request
         else if (pid == 0)
         {
-            p = (long) getpid();
-            printf("* Closing parent's socket fd, my PID=%ld\n",p);
-            close(socket.fd);
+            // p = (long) getpid();
+            // printf("* Closing parent's socket fd, my PID=%ld\n",p);
+            // close(socket.fd);
 
-            printf("* A new connection accepted from  %s, port %d (%d)\n",inet_ntoa(client.sin_addr),ntohs(client.sin_port), client.sin_port);
-            strcpy(buffer,"200 OK: Echo server2 is listening\n"); // sends confirmation to the client
-            msgSize = strlen(buffer);
-            i = write(socket.fd,buffer,msgSize);
+            // printf("* A new connection accepted from  %s, port %d (%d)\n",inet_ntoa(client.sin_addr),ntohs(client.sin_port), client.sin_port);
+            // strcpy(buffer,"200 OK: Echo server2 is listening\n"); // sends confirmation to the client
+            // msgSize = strlen(buffer);
+            // i = write(newsocket,buffer,msgSize);
 
-            if (i != msgSize)
-            {
-	            err(1,"initial write() failed");
-            }
+            // if (i != msgSize)
+            // {
+	        //     err(1,"initial write() failed");
+            // }
 
-            while ((msgSize = read(newsocket, buffer, BUFFER)) > 0)
-            {
-                printf("received data = \"%.*s\"\n",msgSize-2,buffer); // tear off CR+LF from the receiving buffer
+            ldapParser ldapParser;
+            ldapParser.LDAPparse(newsocket);
+            
+            
+
+            // while ((msgSize = read(newsocket, buffer, BUFFER)) > 0)
+            // {
+            //     printf("received data = \"%.*s\"\n",msgSize-2,buffer); // tear off CR+LF from the receiving buffer
 	
-                for (i = 0; i < msgSize; i++)
-                {
-                    if (islower(buffer[i]))
-                    {
-                        buffer[i] = toupper(buffer[i]);
-                    }
-                    else if (isupper(buffer[i]))
-                    {
-                        buffer[i] = tolower(buffer[i]);
-                    }
-                }  
+            //     for (i = 0; i < msgSize; i++)
+            //     {
+            //         if (islower(buffer[i]))
+            //         {
+            //             buffer[i] = toupper(buffer[i]);
+            //         }
+            //         else if (isupper(buffer[i]))
+            //         {
+            //             buffer[i] = tolower(buffer[i]);
+            //         }
+            //     }  
 	
-	            i = write(newsocket,buffer,msgSize);    // send a converted message to the client
-	            if (i == -1)
-                {
-	                err(1,"write() failed.");
-                }                           // check if data was successfully sent out
-	            else if (i != msgSize)
-                {
-	                err(1,"write(): buffer written partially");
-                }
-            }
-            printf("* Closing newsock\n");
+	        //     i = write(newsocket,buffer,msgSize);    // send a converted message to the client
+	        //     if (i == -1)
+            //     {
+	        //         err(1,"write() failed.");
+            //     }                           // check if data was successfully sent out
+	        //     else if (i != msgSize)
+            //     {
+	        //         err(1,"write(): buffer written partially");
+            //     }
+            // }
+            // printf("* Closing newsock\n");
             close(newsocket);                          // close the new socket
             exit(0);   
         }
@@ -178,4 +188,16 @@ void Server::printUsage()
     printf("    --file  -f  <file>\n");
 
     exit(0);
+}
+
+void Server::checkExistenceOfFile(std::string file)
+{
+    std::ifstream inputFile;
+    inputFile.open(file);
+    if (!inputFile.is_open())
+    {
+        fprintf(stderr, "File %s not found!\n", file.c_str());
+        exit(1);
+    }
+    inputFile.close();
 }

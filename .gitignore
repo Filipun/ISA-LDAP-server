@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+#GDPR
+*.csv
+.json

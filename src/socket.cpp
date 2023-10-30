@@ -29,7 +29,7 @@ void Socket::bindSocket(sockaddr_in6 server)
     if (bind(this->fd, (struct sockaddr *)&server, sizeof(server)) < 0)
     {
         fprintf(stderr, "bind() failed\n");
-        //exit(1);
+        exit(1);
     }
     printf("* Socket succesfully bound to the port using bind()\n");
 }
