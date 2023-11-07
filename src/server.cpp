@@ -109,52 +109,13 @@ int Server::run()
         // child process that will handle an incoming request
         else if (pid == 0)
         {
-            // p = (long) getpid();
-            // printf("* Closing parent's socket fd, my PID=%ld\n",p);
-            // close(socket.fd);
+            p = (long) getpid();
+            printf("* Closing parent's socket fd, my PID=%ld\n",p);
+            close(socket.fd);
 
-            // printf("* A new connection accepted from  %s, port %d (%d)\n",inet_ntoa(client.sin_addr),ntohs(client.sin_port), client.sin_port);
-            // strcpy(buffer,"200 OK: Echo server2 is listening\n"); // sends confirmation to the client
-            // msgSize = strlen(buffer);
-            // i = write(newsocket,buffer,msgSize);
-
-            // if (i != msgSize)
-            // {
-	        //     err(1,"initial write() failed");
-            // }
-
-            ldapParser ldapParser;
-            ldapParser.LDAPparse(newsocket);
+            ldapParser ldapParser(newsocket);
+            ldapParser.LDAPparse();
             
-            
-
-            // while ((msgSize = read(newsocket, buffer, BUFFER)) > 0)
-            // {
-            //     printf("received data = \"%.*s\"\n",msgSize-2,buffer); // tear off CR+LF from the receiving buffer
-	
-            //     for (i = 0; i < msgSize; i++)
-            //     {
-            //         if (islower(buffer[i]))
-            //         {
-            //             buffer[i] = toupper(buffer[i]);
-            //         }
-            //         else if (isupper(buffer[i]))
-            //         {
-            //             buffer[i] = tolower(buffer[i]);
-            //         }
-            //     }  
-	
-	        //     i = write(newsocket,buffer,msgSize);    // send a converted message to the client
-	        //     if (i == -1)
-            //     {
-	        //         err(1,"write() failed.");
-            //     }                           // check if data was successfully sent out
-	        //     else if (i != msgSize)
-            //     {
-	        //         err(1,"write(): buffer written partially");
-            //     }
-            // }
-            // printf("* Closing newsock\n");
             close(newsocket);                          // close the new socket
             exit(0);   
         }

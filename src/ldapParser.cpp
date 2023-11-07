@@ -1,19 +1,21 @@
 #include "../include/ldapParser.h"
+#include "../include/sender.h"
 
 
-ldapParser::ldapParser()
+ldapParser::ldapParser(int newsocket)
 {
     // this->byteVector;
     this->indexOfVector = 0;
     this->maxIndexOfVector = 0;
+    this->newsocket = newsocket;
 }
 
-void ldapParser::LDAPparse(int newsocket)
+void ldapParser::LDAPparse()
 {
 
     //  Load ldap message to vector 
     char byte; 
-    while (read(newsocket, &byte, 1) > 0)
+    while (read(this->newsocket, &byte, 1) > 0)
     {
         this->byteVector.push_back((unsigned char)byte);
     }
@@ -83,6 +85,7 @@ void ldapParser::parseLDAPMessage()
     // Check tag of LDAP message
     int ldapVersion = 0;
     std::string name = "";
+    Sender sender(this->newsocket);
     switch (this->byteVector[this->indexOfVector])
     {
         case BIND_REQUEST:
@@ -110,6 +113,9 @@ void ldapParser::parseLDAPMessage()
                     printf("Password is empty and thats right!\n"); // TODO check print
                 }
             }
+
+            sender.BindResponse(MessageID, 0, "", "");
+
             break;
         case SEARCH_REQUEST:
             printf("SEARCH_REQUEST\n");
@@ -176,7 +182,7 @@ void ldapParser::checkLengthOfMessage()
 {
     uint64_t lengthOfTag = this->getLength();
     this->indexOfVector -= 1; // function getLength() increment index of vector
-    printf("Length of tag: %ld\n", lengthOfTag);  // TODO check print
+    printf("\nLength of tag: %ld\n", lengthOfTag);  // TODO check print
     printf("Length of vector: %d\n", this->maxIndexOfVector - this->indexOfVector);  // TODO check print
     if (lengthOfTag != (this->maxIndexOfVector - this->indexOfVector))
     {

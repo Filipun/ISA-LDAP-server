@@ -20,16 +20,17 @@ class ldapParser {
     private:
         int indexOfVector;
         int maxIndexOfVector;
+        int newsocket;
+        std::vector<uint8_t> byteVector;
+        std::string parseOctetString();
         void indexIncrement();
         uint64_t getLength();
-        std::vector<uint8_t> byteVector;
         void parseLDAPMessage();
         int parseInteger();
         void checkLengthOfMessage();
-        std::string parseOctetString();
     public:
-        ldapParser();
-        void LDAPparse (int newsocket);
+        ldapParser(int newsocket);
+        void LDAPparse ();
 };
 
 enum Tags {
