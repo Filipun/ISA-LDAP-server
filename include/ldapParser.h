@@ -15,25 +15,12 @@
 #include <signal.h>
 #include <cstdio>
 #include <vector>
+#include <fcntl.h>
 
-class ldapParser {
-    private:
-        int indexOfVector;
-        int maxIndexOfVector;
-        int newsocket;
-        std::vector<uint8_t> byteVector;
-        std::string parseOctetString();
-        void indexIncrement();
-        uint64_t getLength();
-        void parseLDAPMessage();
-        int parseInteger();
-        void checkLengthOfMessage();
-    public:
-        ldapParser(int newsocket);
-        void LDAPparse ();
-};
 
 enum Tags {
+    ENUM =                  0x0a,
+    BOOL =                  0x01,
     INTEGER =               0x02,
     OCTET_STRING =          0x04,
     SEQUENCE =              0x30,
@@ -46,6 +33,56 @@ enum Tags {
     SEARCH_RESULT_DONE =    0x65,
     SIMPLE_AUTH =           0x80
 };
+
+typedef enum {
+    AND =                   0xa0,
+    OR =                    0xa1,
+    NOT =                   0xa2,
+    EQUALITY_MATCH =        0xa3,
+    SUBSTRINGS =            0xa4,
+} Filter;
+
+typedef enum {
+    BASE_OBJECT =           0x00,
+    SINGLE_LEVEL =          0x01,
+    WHOLE_SUBTREE =         0x02
+} Scope;
+
+typedef struct {
+    std::string ldapdn; // LDAPDN
+    Scope scope;
+    // uint8_t derefAliases; TODO asi skip xd
+    int sizeLimit;
+    int timeLimit;
+    bool typesOnly;
+    Filter filter;
+    std::vector<std::string> attributes; // AttributeDescriptionList
+} SearchRequest;
+
+
+class ldapParser {
+    private:
+        int indexOfVector;
+        int maxIndexOfVector;
+        int newsocket;
+        std::vector<uint8_t> byteVector;
+        std::string parseOctetString();
+        void indexIncrement();
+        uint64_t getLength();
+        void parseLDAPMessage();
+        int parseInteger();
+        Scope parseScope(void);
+        Filter parseFilters(void);
+        bool parseBoolean();
+        void checkLengthOfMessage();
+        void parseBindRequest();
+        SearchRequest parseSearchRequest();
+    public:
+        ldapParser(int newsocket);
+        void msgParse();
+};
+
+
 
 struct ldapMessage {
     int messageID;
@@ -70,16 +107,6 @@ struct UnbindRequest { //TODO asi smazat
     // nothing
 };
 
-struct SearchRequest {
-    std::string baseObject; // LDAPDN
-    uint8_t scope;
-    uint8_t derefAliases;
-    int sizeLimit;
-    int timeLimit;
-    bool typesOnly;
-    int filter;
-    std::vector<std::string> attributes; // AttributeDescriptionList
-};
 
 struct SearchResultEntry {
     std::string objectName; // LDAPDN
