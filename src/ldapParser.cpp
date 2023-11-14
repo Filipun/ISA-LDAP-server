@@ -1,7 +1,6 @@
 #include "../include/ldapParser.h"
 #include "../include/sender.h"
 
-
 ldapParser::ldapParser(int newsocket)
 {
     // this->byteVector;
@@ -282,6 +281,129 @@ Filter ldapParser::parseFilters(void)
 }
 
 // TODO parse filters
+Filters ldapParser::loadFilters()
+{
+    int lengthOfFilter = 0;
+    int endOfFilter = 0;
+    int lengthOfSubstringSequence = 0;
+    int endOfSubstringSequence = 0;
+    int indexBeforeSubfilter = 0; // TODO drzi index pred subfilterem
+    int lengthOfSubfilter = 0; // TODO drzi delku subfilteru
+    Filters newFilter = Filters();
+    switch (this->byteVector[this->indexOfVector])
+    {
+        case 0xa0:
+            newFilter.type = AND;
+            this->indexIncrement();
+            lengthOfFilter = byteVector[this->indexOfVector];
+            endOfFilter = this->indexOfVector + lengthOfFilter;
+            // int indexOfSubFilter = 0; TODO to asi ani neni potreba
+            while (this->indexOfVector < endOfFilter) 
+            { 
+                this->indexIncrement();    // Shift to next filter
+                indexBeforeSubfilter = this->indexOfVector;
+                lengthOfSubfilter = this->byteVector[this->indexOfVector + 1];
+                newFilter.subFilters.push_back(loadFilters());
+                // Insures that index will not be out of range and sets it to next filter
+                if ((indexBeforeSubfilter + lengthOfSubfilter) < this->maxIndexOfVector)
+                {
+                    this->indexOfVector = indexBeforeSubfilter + lengthOfSubfilter + 1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            break;
+        case 0xa1:
+            newFilter.type = OR;
+            this->indexIncrement();
+            lengthOfFilter = byteVector[this->indexOfVector];
+            endOfFilter = this->indexOfVector + lengthOfFilter;
+            
+            // int indexOfSubFilter = 0; TODO to asi ani neni potreba
+            while (this->indexOfVector < endOfFilter) 
+            { 
+                this->indexIncrement();
+                // printf("Byte %02X\n", this->byteVector[this->indexOfVector]); // TODO check print
+                // printf("Byte delka: %02X\n", this->byteVector[this->indexOfVector + 1]); // TODO check print
+                indexBeforeSubfilter = this->indexOfVector;
+                lengthOfSubfilter = this->byteVector[this->indexOfVector + 1];
+                newFilter.subFilters.push_back(loadFilters());
+               
+                // Insures that index will not be out of range and sets it to next filter
+                if ((indexBeforeSubfilter + lengthOfSubfilter) < this->maxIndexOfVector)
+                {
+                    this->indexOfVector = indexBeforeSubfilter + lengthOfSubfilter + 1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            break;
+        case 0xa2:
+            newFilter.type = NOT;
+            this->indexIncrement();
+            lengthOfFilter = byteVector[this->indexOfVector];
+            endOfFilter = this->indexOfVector + lengthOfFilter;
+            // int indexOfSubFilter = 0; TODO to asi ani neni potreba
+            this->indexIncrement();
+            // TODO mel by tam byt jen jeden 
+            newFilter.subFilters.push_back(loadFilters());
+            break;
+        case 0xa3:
+            newFilter.type = EQUALITY_MATCH;
+            this->indexIncrement(); // Skip length of substring filter
+            this->indexIncrement();
+            newFilter.value.assertionValue = parseOctetString();
+            newFilter.value.attributeDesc = parseOctetString();
+
+            break;
+        case 0xa4:
+            newFilter.type = SUBSTRINGS;
+            this->indexIncrement(); // Skip length of substring filter
+            this->indexIncrement();
+            newFilter.substringFilter.type = parseOctetString();
+            if (this->byteVector[this->indexOfVector] != SEQUENCE)
+            {
+                fprintf(stderr, "Wrong BER message!\nExpected SEQUENCE tag!\n");
+                exit(1);
+            }
+            this->indexIncrement();
+            lengthOfSubstringSequence = this->byteVector[this->indexOfVector];
+            endOfSubstringSequence = this->indexOfVector + lengthOfSubstringSequence;
+            this->indexIncrement();
+            while (this->indexOfVector < endOfSubstringSequence)
+            {
+                switch (this->byteVector[this->indexOfVector])
+                {
+                case SUB_INITIAL:
+                    this->byteVector[this->indexOfVector] = OCTET_STRING; 
+                    newFilter.substringFilter.substrings.initial = parseOctetString();
+                    break;
+                case SUB_ANY:
+                    this->byteVector[this->indexOfVector] = OCTET_STRING; 
+
+                    newFilter.substringFilter.substrings.any = parseOctetString();
+                    break;
+                case SUB_FINAL:
+                    this->byteVector[this->indexOfVector] = OCTET_STRING; 
+                    newFilter.substringFilter.substrings.final = parseOctetString();
+                    break;
+                default:
+                    fprintf(stderr, "Wrong BER message!\nExpected SUB_INITIAL, SUB_ANY or SUB_FINAL tag!\n");
+                    exit(1);
+                }
+            }
+            break;
+        default:
+            return newFilter;
+    }
+    this->indexIncrement();
+
+    return newFilter;
+}
 
 void ldapParser::checkLengthOfMessage()
 {
@@ -374,10 +496,20 @@ SearchRequest ldapParser::parseSearchRequest()
     this->indexIncrement();
 
     request.filter = this->parseFilters();
-    printf("Filter: %d\n", request.filter); // TODO check print
-    this->indexIncrement();
+    printf("Filter: %02X\n", request.filter); // TODO check print
+    //this->indexIncrement();
     
     // TODO parse filters
+    request.filters = this->loadFilters();
+
+    // printf("Filters: %02X\n", request.filters.type); // TODO check print
+    // printf("Filters: %02X\n", request.filters.subFilters[0].type); // TODO check print
+    // printf("Filters: %02X\n", request.filters.subFilters[1].type); // TODO check print
+    // printf("Filters: %02X\n", request.filters.subFilters[2].type); // TODO check print
+    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.type.c_str()); // TODO check print
+    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.substrings.any.c_str()); // TODO check print
+    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.substrings.final.c_str()); // TODO check print
+    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.substrings.initial.c_str()); // TODO check print
 
     return request;
 }

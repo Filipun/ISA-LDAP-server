@@ -31,7 +31,10 @@ enum Tags {
     SEARCH_REQUEST =        0x63,
     SEAECH_RESULT_ENTRY =   0x64,
     SEARCH_RESULT_DONE =    0x65,
-    SIMPLE_AUTH =           0x80
+    SIMPLE_AUTH =           0x80,
+    SUB_INITIAL =           0x80,
+    SUB_ANY =               0x81,
+    SUB_FINAL =             0x82,
 };
 
 typedef enum {
@@ -48,6 +51,29 @@ typedef enum {
     WHOLE_SUBTREE =         0x02
 } Scope;
 
+struct Substrings {
+    std::string initial;
+    std::string any;
+    std::string final;
+};
+
+struct SubstringFilter {
+    std::string type;
+    Substrings substrings;
+};
+
+struct AttributeValueAssertion {
+    std::string attributeDesc;
+    std::string assertionValue;
+};
+
+typedef struct Filters{
+    Filter type;
+    std::vector<Filters> subFilters;
+    SubstringFilter substringFilter;
+    AttributeValueAssertion value;
+};
+
 typedef struct {
     std::string ldapdn; // LDAPDN
     Scope scope;
@@ -56,7 +82,7 @@ typedef struct {
     int timeLimit;
     bool typesOnly;
     Filter filter;
-    std::vector<std::string> attributes; // AttributeDescriptionList
+    Filters filters; // AttributeDescriptionList
 } SearchRequest;
 
 
@@ -73,6 +99,7 @@ class ldapParser {
         int parseInteger();
         Scope parseScope(void);
         Filter parseFilters(void);
+        Filters loadFilters();  
         bool parseBoolean();
         void checkLengthOfMessage();
         void parseBindRequest();
