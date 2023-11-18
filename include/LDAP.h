@@ -7,8 +7,9 @@
 class LDAP {
     private:
         int newsocket;
+        std::string file;
     public:
-        LDAP(int newsocket);
+        LDAP(int newsocket, std::string file);
         void LDAPrun();
 };
 

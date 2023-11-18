@@ -1,5 +1,6 @@
 #include "../include/ldapParser.h"
 #include "../include/sender.h"
+#include "../include/DBreader.h"
 
 ldapParser::ldapParser(int newsocket)
 {
@@ -9,7 +10,7 @@ ldapParser::ldapParser(int newsocket)
     this->newsocket = newsocket;
 }
 
-void ldapParser::msgParse()
+void ldapParser::msgParse(std::string file)
 {
     //  Load ldap message to vector of bytes
     while (1)
@@ -50,7 +51,7 @@ void ldapParser::msgParse()
             }
             
             this->maxIndexOfVector = this->byteVector.size() - 1;
-            this->parseLDAPMessage();   
+            this->parseLDAPMessage(file);   
 
             // Clean vector
             this->byteVector.clear();
@@ -97,7 +98,7 @@ uint64_t ldapParser::getLength()
     return length;
 }
 
-void ldapParser::parseLDAPMessage()
+void ldapParser::parseLDAPMessage(std::string file)
 {
     // Check SEQUENCE tag
     if (this->byteVector[this->indexOfVector] != SEQUENCE)
@@ -123,6 +124,10 @@ void ldapParser::parseLDAPMessage()
 
     SearchRequest request;
 
+    DBreader dbReader(request, file);
+
+    std::vector<Line> AllValidLines;
+
     // Messages 
     switch (this->byteVector[this->indexOfVector])
     {
@@ -137,6 +142,14 @@ void ldapParser::parseLDAPMessage()
             this->indexIncrement();
             request = this->parseSearchRequest();
             printf("mame po parse\n");
+            dbReader.request = request;
+            AllValidLines = dbReader.Run();
+            // Send search result entrys
+            for (auto line : AllValidLines)
+            {
+                sender.SearchResultEntry(request, line, MessageID);
+            }
+            sender.SearchResultDone(MessageID, "", 0);
             break;
         case UNBIND_REQUEST:
             printf("UNBIND_REQUEST\n");
@@ -340,9 +353,8 @@ Filters ldapParser::loadFilters()
             newFilter.type = EQUALITY_MATCH;
             this->indexIncrement(); // Skip length of substring filter
             this->indexIncrement();
-            newFilter.value.assertionValue = parseOctetString();
             newFilter.value.attributeDesc = parseOctetString();
-
+            newFilter.value.assertionValue = parseOctetString();
             break;
         case 0xa4:
             newFilter.type = SUBSTRINGS;
@@ -415,6 +427,12 @@ std::vector<std::string> ldapParser::parseAttributeDescriptionList()
         exit(1);
     }
     this->indexIncrement();
+
+    if (this->byteVector[this->indexOfVector] == 0x00)
+    {
+        attributes[0] = "";
+        return attributes;
+    }
 
     int lengthOfSequence = this->byteVector[this->indexOfVector];
     int endOfSequence = this->indexOfVector + lengthOfSequence;
@@ -513,7 +531,14 @@ SearchRequest ldapParser::parseSearchRequest()
     
     if (this->byteVector[this->indexOfVector] == SEQUENCE)
     {
-        request.attributes = this->parseAttributeDescriptionList();
+        if (this->byteVector[this->indexOfVector + 1] == 0x00)
+        {
+            request.attributes = std::vector<std::string>();
+        }
+        else
+        {
+            request.attributes = this->parseAttributeDescriptionList();
+        }
     }
     
     // printf("Filters: %02X\n", request.filters.type); // TODO check print

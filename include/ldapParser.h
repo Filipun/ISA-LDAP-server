@@ -45,20 +45,20 @@ typedef enum {
     SUBSTRINGS =            0xa4,
 } Filter;
 
-typedef enum {
+enum Scope{
     BASE_OBJECT =           0x00,
     SINGLE_LEVEL =          0x01,
     WHOLE_SUBTREE =         0x02
-} Scope;
+};
 
 struct Substrings {
     std::string initial;
-    std::string any;
+    std::vector<std::string> any;
     std::string final;
 };
 
 struct SubstringFilter {
-    std::string type;
+    std::string type;   // AttributeDescription sloupec
     Substrings substrings;
 };
 
@@ -67,7 +67,7 @@ struct AttributeValueAssertion {
     std::string assertionValue;
 };
 
-typedef struct Filters{
+struct Filters{
     Filter type;
     std::vector<Filters> subFilters;
     SubstringFilter substringFilter;
@@ -81,8 +81,8 @@ typedef struct {
     int sizeLimit;
     int timeLimit;
     bool typesOnly;
-    Filter filter;
-    Filters filters; // AttributeDescriptionList
+    Filters filters;
+    std::vector<std::string> attributes; // AttributeDescriptionList
 } SearchRequest;
 
 
@@ -95,18 +95,18 @@ class ldapParser {
         std::string parseOctetString();
         void indexIncrement();
         uint64_t getLength();
-        void parseLDAPMessage();
+        void parseLDAPMessage(std::string file);
         int parseInteger();
-        Scope parseScope(void);
-        Filter parseFilters(void);
+        Scope parseScope();
         Filters loadFilters();  
         bool parseBoolean();
         void checkLengthOfMessage();
         void parseBindRequest();
         SearchRequest parseSearchRequest();
+        std::vector<std::string> parseAttributeDescriptionList();
     public:
         ldapParser(int newsocket);
-        void msgParse();
+        void msgParse(std::string file);
 };
 
 
@@ -145,7 +145,5 @@ struct SearchResultDone {
     std::string matchedDN; // LDAPDN
     std::string errorMessage; // LDAPString
 };
-
-
 
 #endif

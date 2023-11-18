@@ -1,5 +1,6 @@
 #include "../include/server.h"
 #include "../include/ldapParser.h"
+#include "../include/LDAP.h"
 
 Server::Server()
 {
@@ -48,8 +49,13 @@ void Server::parseArguments(int args, char* argv[])
     }
 }
 
+
 int Server::run()
 {
+
+    // SIGINT handler TODO
+    // signal(SIGINT, &sigintHandler);
+
     // pak asi predelat ========================================
     int newsocket;
     int len, msgSize, i;
@@ -113,8 +119,17 @@ int Server::run()
             printf("* Closing parent's socket fd, my PID=%ld\n",p);
             close(socket.fd);
 
-            ldapParser ldapParser(newsocket);
-            ldapParser.LDAPparse();
+            // Set socket to unblocking mode
+            int flags = fcntl(newsocket, F_GETFL, 0);
+            fcntl(newsocket, F_SETFL, flags | O_NONBLOCK);
+            this->newsocket = newsocket;
+
+
+            LDAP ldap(newsocket, this->file);
+            ldap.LDAPrun();
+
+            // ldapParser ldapParser(newsocket); TODO delete
+            // ldapParser.LDAPparse();
             
             close(newsocket);                          // close the new socket
             exit(0);   
@@ -150,6 +165,13 @@ void Server::printUsage()
 
     exit(0);
 }
+
+// TODO nefunguje spravit pak
+// static void Server::sigintHandler(int signal)
+// {
+//     printf("\n* SIGINT received\n");
+//     exit(signal);
+// }
 
 void Server::checkExistenceOfFile(std::string file)
 {

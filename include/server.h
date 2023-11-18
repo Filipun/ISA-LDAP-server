@@ -20,10 +20,12 @@ class Server {
     private:
         int port;
         std::string file;
+        int newsocket;
         // Socket socket;
         // int newsocket;
         // int len, msg_size, i;
         void checkExistenceOfFile(std::string file);
+        //static void sigintHandler(int signal); TODO
     public:
         Server();
         void parseArguments(int argc, char* argv[]);
