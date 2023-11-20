@@ -1,11 +1,33 @@
+/**
+ * @file DBreader.cpp
+ * @author Filip Polomski, xpolom00 
+ * @brief DB reader file with implementation of DBreader class
+ * @version 1.0
+ * @date 2023-11-20
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include "../include/DBreader.h"
 
+/**
+ * @brief Construct a new DBreader:: DBreader object
+ * 
+ * @param request 
+ * @param file 
+ */
 DBreader::DBreader(SearchRequest request, std::string file)
 {
     this->request = request;
     this->file = file;
 }
 
+/**
+ * @brief Method for running DBreader
+ * 
+ * @return std::vector<Line> Retuns all valid lines
+ */
 std::vector<Line> DBreader::Run()
 {
     std::ifstream file(this->file);
@@ -18,23 +40,14 @@ std::vector<Line> DBreader::Run()
 
     while (std::getline(file, line))
     {
+        // Split line
         splitLine = lineSplit(line.erase(line.size() - 1));
-        // printf("%s\n", splitLine.cn.c_str()); //TODO remove
-        // printf("%s\n", splitLine.uid.c_str()); //TODO remove
-        // printf("%d\n", splitLine.uid.size()); //TODO remove
-        // printf("%s\n", filters.value.assertionValue.c_str()); //TODO remove
-        // printf("%d\n", filters.value.assertionValue.size()); //TODO remove
-        // printf("%s\n", splitLine.mail.c_str()); //TODO remove
 
+        // Check if line is valid
         validityOfLine = validLineCheck(splitLine, this->request.filters);
-        // printf("validityOfLine: %d\n", validityOfLine);
-        // printf("filter return type: %d\n", this->filters.type);
 
         if (validityOfLine == FILTER_RETURN_BOOL_TRUE)
         {
-            printf("%s\n", splitLine.cn.c_str());
-            printf("%s\n", splitLine.uid.c_str());
-            printf("%s\n", splitLine.mail.c_str());
             AllValidLines.push_back(splitLine);
         }
         else if (validityOfLine == FILTER_RETURN_BOOL_FALSE)
@@ -43,13 +56,19 @@ std::vector<Line> DBreader::Run()
         }
         else
         {
-            fprintf(stderr, "Error: Unknown return type\n");
-            exit(1); // TODO return msg with error code
+            fprintf(stderr, "Undefined atribut type, there are only these: cn, uid or mail!\n");
+            exit(1);
         }
     }
     return AllValidLines;
 }
 
+/**
+ * @brief Method for splitting line
+ * 
+ * @param line String to split
+ * @return Line Returns struct with split line
+ */
 Line DBreader::lineSplit(std::string& line)
 {
     Line splitLine;
@@ -60,11 +79,13 @@ Line DBreader::lineSplit(std::string& line)
 
     char delimiter = ';';
 
+    // Spliting string by delimiter
     while (std::getline(ss, stringOfSplit, delimiter))
     {
         split.push_back(stringOfSplit);
     }
 
+    // Saving split line to struct
     splitLine.cn = split[0];
     splitLine.uid = split[1];
     splitLine.mail = split[2];
@@ -72,13 +93,15 @@ Line DBreader::lineSplit(std::string& line)
     return splitLine;
 }
 
+/**
+ * @brief Method for checking if line is valid recursively
+ * 
+ * @param line Line to check
+ * @param filters Filters to check
+ * @return FilterReturnType Returns if line is valid or not.
+ */
 FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
 {
-    // if (line.cn.empty() || line.uid.empty() || line.mail.empty())
-    // {
-    //     // fprintf(stderr, "Error: Invalid line in DB file\n");
-    //     // exit(1); // TODO return msg with error code
-    // }
     int length = filters.subFilters.size();
     FilterReturnType wasAllValid = FILTER_RETURN_BOOL_FALSE;
     FilterReturnType wasAnyValid = FILTER_RETURN_BOOL_FALSE;
@@ -86,8 +109,6 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
     std::string cn = "cn";
     std::string uid = "uid";
     std::string mail = "mail";
-
-    // printf("Filter: %s\n", filters.value.attributeDesc.c_str());
 
     switch (filters.type)
     {
@@ -108,10 +129,6 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                 {
                     wasAnyValid = FILTER_RETURN_BOOL_TRUE;
                 }
-                // else
-                // {
-                //     continue;
-                // }
             }
             if (wasAnyValid)
             {
@@ -128,7 +145,7 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
 
             if (filters.value.attributeDesc == cn)
             {
-                if (filters.value.assertionValue == line.cn)
+                if (stringToLower(filters.value.assertionValue) == stringToLower(line.cn))
                 {
                     return FILTER_RETURN_BOOL_TRUE;
                 }
@@ -136,38 +153,30 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
             }
             else if (filters.value.attributeDesc == uid)
             {
-                // printf("%s\n", line.uid.c_str()); //TODO remove
-                // printf("%d\n", line.uid.size()); //TODO remove
-                // printf("%s\n", filters.value.assertionValue.c_str()); //TODO remove
-                // printf("%d\n", filters.value.assertionValue.size()); //TODO remove
-                if (filters.value.assertionValue == line.uid)
+                if (stringToLower(filters.value.assertionValue) == stringToLower(line.uid))
                 {
-                    // printf("aaaaaaaaaaaaaaaaaaaaaa");
                     return FILTER_RETURN_BOOL_TRUE;
                 }
                 return FILTER_RETURN_BOOL_FALSE;
             }
             else if (filters.value.attributeDesc == mail)
             {
-                if (filters.value.assertionValue == line.mail)
+                if (stringToLower(filters.value.assertionValue) == stringToLower(line.mail))
                 {
                     return FILTER_RETURN_BOOL_TRUE;
                 }
                 return FILTER_RETURN_BOOL_FALSE;
-            }
-            else
-            {
-                printf("Error: Takovy sloupecek tam neni.\n"); // TODO SMAZ
             }
             break;
         case SUBSTRINGS:
-            // printf("Substring initial %s\n", filters.substringFilter.substrings.initial.c_str());
-            // printf("Substring any %s\n", filters.substringFilter.substrings.any[0].c_str());
-            // printf("Substring final %s\n", filters.substringFilter.substrings.final.c_str());
+            // Substring in cn
             if (filters.substringFilter.type == cn)
             {
+                // Initial substring
+                line.cn = stringToLower(line.cn);
                 if (filters.substringFilter.substrings.initial != "")
                 {
+                    filters.substringFilter.substrings.initial = stringToLower(filters.substringFilter.substrings.initial);
                     if ((line.uid.find(filters.substringFilter.substrings.initial) != std::string::npos) && (line.uid.find(filters.substringFilter.substrings.initial) == 0))
                     {
                         wasAllValid = FILTER_RETURN_BOOL_TRUE;
@@ -177,11 +186,12 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                         return FILTER_RETURN_BOOL_FALSE;
                     }
                 }
+                // Any substring
                 if (filters.substringFilter.substrings.any.size() != 0)
                 {
-                    for (int i = 0; i < filters.substringFilter.substrings.any.size(); i++)
+                    for (int i = 0; i < (int)filters.substringFilter.substrings.any.size(); i++)
                     {
-                        if (line.cn.find(filters.substringFilter.substrings.any[i]) != std::string::npos)
+                        if (line.cn.find(stringToLower(filters.substringFilter.substrings.any[i])) != std::string::npos)
                         {
                             wasAllValid = FILTER_RETURN_BOOL_TRUE;
                         }
@@ -191,9 +201,11 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                         }
                     }
                 }
+                // Final substring
                 if (filters.substringFilter.substrings.final != "")
                 {
-                    if ((line.cn.find(filters.substringFilter.substrings.final) == (line.cn.size() - (filters.substringFilter.substrings.final.size() + 1))) != std::string::npos)
+                    filters.substringFilter.substrings.final = stringToLower(filters.substringFilter.substrings.final);
+                    if ((line.cn.find(filters.substringFilter.substrings.final) == (line.cn.size() - (filters.substringFilter.substrings.final.size() + 1))) && (line.cn.find(filters.substringFilter.substrings.final) != std::string::npos)) //TODO koukni se na to jeste more
                     {
                         wasAllValid = FILTER_RETURN_BOOL_TRUE;
                     }
@@ -208,10 +220,14 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                 }
                 return FILTER_RETURN_BOOL_FALSE;
             }
+            // Substring in uid
             else if (filters.substringFilter.type == uid)
             {
+                // Initial substring
+                line.uid = stringToLower(line.uid);
                 if (filters.substringFilter.substrings.initial != "")
                 {
+                    filters.substringFilter.substrings.initial = stringToLower(filters.substringFilter.substrings.initial);
                     if ((line.uid.find(filters.substringFilter.substrings.initial) != std::string::npos) && (line.uid.find(filters.substringFilter.substrings.initial) == 0))
                     {
                         wasAllValid = FILTER_RETURN_BOOL_TRUE;
@@ -221,11 +237,14 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                         return FILTER_RETURN_BOOL_FALSE;
                     }
                 }
+                // Any substring
                 if (filters.substringFilter.substrings.any.size() != 0)
                 {
-                    for (int i = 0; i < filters.substringFilter.substrings.any.size(); i++)
+                    for (int i = 0; i < (int)filters.substringFilter.substrings.any.size(); i++)
                     {
-                        if (line.uid.find(filters.substringFilter.substrings.any[i]) != std::string::npos)
+                        printf("%s\n", line.uid.c_str());
+                        printf("%s\n", filters.substringFilter.substrings.any[i].c_str());
+                        if (line.uid.find(stringToLower(filters.substringFilter.substrings.any[i])) != std::string::npos)
                         {
                             wasAllValid = FILTER_RETURN_BOOL_TRUE;
                         }
@@ -235,9 +254,11 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                         }
                     }
                 }
+                // Final substring
                 if (filters.substringFilter.substrings.final != "")
                 {
-                    if ((line.uid.find(filters.substringFilter.substrings.final) == (line.uid.size() - (filters.substringFilter.substrings.final.size() + 1))) != std::string::npos)
+                    filters.substringFilter.substrings.final = stringToLower(filters.substringFilter.substrings.final);
+                    if ((line.uid.find(filters.substringFilter.substrings.final) == (line.uid.size() - (filters.substringFilter.substrings.final.size() + 1))) && (line.uid.find(filters.substringFilter.substrings.final) != std::string::npos))
                     {
                         wasAllValid = FILTER_RETURN_BOOL_TRUE;
                     }
@@ -252,11 +273,15 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                 }
                 return FILTER_RETURN_BOOL_FALSE;
             }
+            // Substring in mail
             else if (filters.substringFilter.type == mail)
             {
-               if (filters.substringFilter.substrings.initial != "")
+                // Initial substring
+                line.mail = stringToLower(line.mail);
+                if (filters.substringFilter.substrings.initial != "")
                 {
-                    if ((line.uid.find(filters.substringFilter.substrings.initial) != std::string::npos) && (line.uid.find(filters.substringFilter.substrings.initial) == 0))
+                    filters.substringFilter.substrings.initial = stringToLower(filters.substringFilter.substrings.initial);
+                    if ((line.mail.find(filters.substringFilter.substrings.initial) != std::string::npos) && (line.mail.find(filters.substringFilter.substrings.initial) == 0))
                     {
                         wasAllValid = FILTER_RETURN_BOOL_TRUE;
                     }
@@ -265,11 +290,12 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                         return FILTER_RETURN_BOOL_FALSE;
                     }
                 }
+                // Any substring
                 if (filters.substringFilter.substrings.any.size() != 0)
                 {
-                    for (int i = 0; i < filters.substringFilter.substrings.any.size(); i++)
+                    for (int i = 0; i < (int)filters.substringFilter.substrings.any.size(); i++)
                     {
-                        if (line.mail.find(filters.substringFilter.substrings.any[i]) != std::string::npos)
+                        if (line.mail.find(stringToLower(filters.substringFilter.substrings.any[i])) != std::string::npos)
                         {
                             wasAllValid = FILTER_RETURN_BOOL_TRUE;
                         }
@@ -279,9 +305,11 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
                         }
                     }
                 }
+                // Final substring
                 if (filters.substringFilter.substrings.final != "")
                 {
-                    if ((line.mail.find(filters.substringFilter.substrings.final) == (line.mail.size() - (filters.substringFilter.substrings.final.size() + 1))) != std::string::npos)
+                    filters.substringFilter.substrings.final = stringToLower(filters.substringFilter.substrings.final);
+                    if ((line.mail.find(filters.substringFilter.substrings.final) == (line.mail.size() - (filters.substringFilter.substrings.final.size() + 1))) && (line.mail.find(filters.substringFilter.substrings.final) != std::string::npos))
                     {
                         wasAllValid = FILTER_RETURN_BOOL_TRUE;
                     }
@@ -298,13 +326,30 @@ FilterReturnType DBreader::validLineCheck(Line line, Filters filters)
             }
             else
             {
-                printf("Error: Takovy sloupecek tam neni.\n"); // TODO SMAZ
+                fprintf(stderr, "Three value logic is not supported\nFilter by rows cn, uid or mail!\n");
+                exit(1); 
             }
             break;
         default:
             return FILTER_RETURN_UNDEFINED;
     }
-
-
     return FILTER_RETURN_UNDEFINED;
+}
+
+/**
+ * @brief Method for converting string to lower case
+ * 
+ * @param str String to convert
+ * @return std::string Returns converted string.
+ */
+std::string DBreader::stringToLower(std::string str)
+{
+    std::string lowerStr;
+    
+    for (char c : str)
+    {
+        lowerStr += tolower(c);
+    }
+
+    return lowerStr;
 }

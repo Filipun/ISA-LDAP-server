@@ -1,3 +1,14 @@
+/**
+ * @file ldapParser.h
+ * @author Filip Polomski, xpolom00
+ * @brief LDAP parser header file
+ * @version 1.0
+ * @date 2023-11-20
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #ifndef LDAP_PARSER_H
 #define LDAP_PARSER_H
 #include <string.h>
@@ -18,16 +29,16 @@
 #include <fcntl.h>
 
 
+
 enum Tags {
     ENUM =                  0x0a,
     BOOL =                  0x01,
     INTEGER =               0x02,
     OCTET_STRING =          0x04,
     SEQUENCE =              0x30,
-    // Aplication 6x
     BIND_REQUEST =          0x60,
     BIND_RESPONSE =         0x61,
-    UNBIND_REQUEST =        0x62,
+    UNBIND_REQUEST =        0x42,
     SEARCH_REQUEST =        0x63,
     SEAECH_RESULT_ENTRY =   0x64,
     SEARCH_RESULT_DONE =    0x65,
@@ -43,6 +54,7 @@ typedef enum {
     NOT =                   0xa2,
     EQUALITY_MATCH =        0xa3,
     SUBSTRINGS =            0xa4,
+    FILTER_UNDEFINED =      0xff,
 } Filter;
 
 enum Scope{
@@ -58,7 +70,7 @@ struct Substrings {
 };
 
 struct SubstringFilter {
-    std::string type;   // AttributeDescription sloupec
+    std::string type;  // AttributeDescription
     Substrings substrings;
 };
 
@@ -75,9 +87,8 @@ struct Filters{
 };
 
 typedef struct {
-    std::string ldapdn; // LDAPDN
+    std::string ldapdn; 
     Scope scope;
-    // uint8_t derefAliases; TODO asi skip xd
     int sizeLimit;
     int timeLimit;
     bool typesOnly;
@@ -95,7 +106,7 @@ class ldapParser {
         std::string parseOctetString();
         void indexIncrement();
         uint64_t getLength();
-        void parseLDAPMessage(std::string file);
+        bool parseLDAPMessage(std::string file);
         int parseInteger();
         Scope parseScope();
         Filters loadFilters();  
@@ -107,43 +118,6 @@ class ldapParser {
     public:
         ldapParser(int newsocket);
         void msgParse(std::string file);
-};
-
-
-
-struct ldapMessage {
-    int messageID;
-    uint64_t length;
-    uint8_t tag;
-};
-
-
-struct BindRequest {
-    uint8_t version;
-    std::string name; // LDAPDN
-    std::string password; // TODO poop asi idk
-};
-
-struct BindResponse {
-    uint8_t resultCode;
-    std::string matchedDN; // LDAPDN
-    std::string errorMessage; // LDAPString
-};
-
-struct UnbindRequest { //TODO asi smazat
-    // nothing
-};
-
-
-struct SearchResultEntry {
-    std::string objectName; // LDAPDN
-    std::vector<std::string> attributes; // PartialAttributeList
-};
-
-struct SearchResultDone {
-    int resultCode;
-    std::string matchedDN; // LDAPDN
-    std::string errorMessage; // LDAPString
 };
 
 #endif

@@ -1,7 +1,23 @@
+/**
+ * @file ldapParser.cpp
+ * @author Filip Polomski, xpolom00
+ * @brief LDAP parser file with implementation of LDAP parser class
+ * @version 1.0
+ * @date 2023-11-20
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include "../include/ldapParser.h"
 #include "../include/sender.h"
 #include "../include/DBreader.h"
 
+/**
+ * @brief Construct a new ldap Parser::ldap Parser object
+ * 
+ * @param newsocket 
+ */
 ldapParser::ldapParser(int newsocket)
 {
     // this->byteVector;
@@ -10,6 +26,11 @@ ldapParser::ldapParser(int newsocket)
     this->newsocket = newsocket;
 }
 
+/**
+ * @brief Method for parsing message
+ * 
+ * @param file 
+ */
 void ldapParser::msgParse(std::string file)
 {
     //  Load ldap message to vector of bytes
@@ -17,6 +38,8 @@ void ldapParser::msgParse(std::string file)
     {
         char byte; 
         int readresult;
+
+        // Set monitoring socket
         fd_set read_fds;
         FD_ZERO(&read_fds);
         FD_SET(newsocket, &read_fds);
@@ -29,6 +52,7 @@ void ldapParser::msgParse(std::string file)
             fprintf(stderr, "Error while select!\n");
             exit(1);
         }
+        // Loading message with controll print
         else
         {
             int i = 0;
@@ -42,7 +66,7 @@ void ldapParser::msgParse(std::string file)
                     j++;
                     i = 0;	
                 }
-                printf("%02X ", (unsigned char)byte); // TODO check print
+                printf("%02X ", (unsigned char)byte);
                 i++;
                 if (i % 8 == 0 && i != 0)
                 {
@@ -50,8 +74,12 @@ void ldapParser::msgParse(std::string file)
                 }
             }
             
+            // Calling method for parsing and for unbind request ending
             this->maxIndexOfVector = this->byteVector.size() - 1;
-            this->parseLDAPMessage(file);   
+            if (this->parseLDAPMessage(file))
+            {
+                break;
+            }   
 
             // Clean vector
             this->byteVector.clear();
@@ -60,6 +88,10 @@ void ldapParser::msgParse(std::string file)
     }
 }
 
+/**
+ * @brief Method for incrementing index of vector and checking if it is not out of range.
+ * 
+ */
 void ldapParser::indexIncrement()
 {
     if (this->indexOfVector > this->maxIndexOfVector)
@@ -77,9 +109,15 @@ void ldapParser::indexIncrement()
     }
 }
 
+/**
+ * @brief Method for getting length of tag.
+ * 
+ * @return uint64_t Length of tag.
+ */
 uint64_t ldapParser::getLength()
 {
     uint64_t length = 0;
+    // Check if length is in long form
     if (((this->byteVector[this->indexOfVector] >> 7) & 1))
     {
         uint8_t LengthOfLongLength; 
@@ -90,15 +128,23 @@ uint64_t ldapParser::getLength()
             this->indexIncrement();
         }
     }
-    else // Length in short form
+    // Length in short form
+    else 
     {
         length = this->byteVector[this->indexOfVector] & 0x7f;
         this->indexIncrement();
     }
+
     return length;
 }
 
-void ldapParser::parseLDAPMessage(std::string file)
+/**
+ * @brief Method for parsing LDAP message and calling database reader for filtering and then sender for sending responses.
+ * 
+ * @param file input file
+ * @return bool True if message is unbind request, false otherwise. 
+ */
+bool ldapParser::parseLDAPMessage(std::string file)
 {
     // Check SEQUENCE tag
     if (this->byteVector[this->indexOfVector] != SEQUENCE)
@@ -114,12 +160,8 @@ void ldapParser::parseLDAPMessage(std::string file)
     this->indexIncrement();
 
     int MessageID = this->parseInteger();
-
-    printf("MessageID: %d\n", MessageID); // TODO check print
     
-    // Check tag of LDAP message
-    int ldapVersion = 0;
-    std::string name = "";
+
     Sender sender(this->newsocket);
 
     SearchRequest request;
@@ -128,32 +170,40 @@ void ldapParser::parseLDAPMessage(std::string file)
 
     std::vector<Line> AllValidLines;
 
-    // Messages 
+    // Parsing messages and sending responses
     switch (this->byteVector[this->indexOfVector])
     {
         case BIND_REQUEST:
             printf("BIND_REQUEST\n");
             this->indexIncrement();
             this->parseBindRequest();
-            sender.BindResponse(MessageID, 0, "", "");
-            break;
+            sender.BindResponse(MessageID, 0, "");
+            return false;
         case SEARCH_REQUEST:
             printf("SEARCH_REQUEST\n");
             this->indexIncrement();
             request = this->parseSearchRequest();
             printf("mame po parse\n");
             dbReader.request = request;
+            dbReader.messageID = MessageID;
             AllValidLines = dbReader.Run();
             // Send search result entrys
+            if (request.sizeLimit != 0)
+            {
+                if ((int)AllValidLines.size() > request.sizeLimit)
+                {
+                    AllValidLines.resize(request.sizeLimit);
+                }
+            }
             for (auto line : AllValidLines)
             {
                 sender.SearchResultEntry(request, line, MessageID);
             }
             sender.SearchResultDone(MessageID, "", 0);
-            break;
+            return false;
         case UNBIND_REQUEST:
             printf("UNBIND_REQUEST\n");
-            break;
+            return true;
         default:
             fprintf(stderr, "Wrong BER message!\nExpected BIND_REQUEST, SEARCH_REQUEST or UNBIND_REQUEST tag!\n");
             exit(1);
@@ -161,6 +211,11 @@ void ldapParser::parseLDAPMessage(std::string file)
 
 }
 
+/*
+* @brief Method for parsing octet string.
+* 
+* @return std::string Octet string.
+*/
 std::string ldapParser::parseOctetString() 
 {
     // Check octet string tag
@@ -175,15 +230,21 @@ std::string ldapParser::parseOctetString()
 
     std::string octetString = "";
 
+    // Loading octet string
     for (u_int64_t i = 0; i < lengthOfOctetString; i++)
     {
-        octetString += this->byteVector[this->indexOfVector];  // TODO bude to fungovat a prepisovat z hexa na pismenka?
+        octetString += this->byteVector[this->indexOfVector];
         this->indexIncrement();
     }
 
     return octetString;
 }
 
+/**
+ * @brief Method for parsing integer.
+ * 
+ * @return int Integer.
+ */
 int ldapParser::parseInteger()
 {
     // Check integer tag
@@ -194,12 +255,11 @@ int ldapParser::parseInteger()
     }
     this->indexIncrement();
 
-    //this->checkLengthOfTags();
-
     uint64_t lengthOfInteger = this->getLength();
 
     int integer = 0;
 
+    // Loading integer
     for (u_int64_t i = 0; i < lengthOfInteger; i++)
     {
         integer = (integer << 8) | byteVector[this->indexOfVector];
@@ -209,6 +269,11 @@ int ldapParser::parseInteger()
     return integer;
 }
 
+/**
+ * @brief Method for parsing scope.
+ * 
+ * @return Scope Scope.
+ */
 Scope ldapParser::parseScope()
 {
     if (this->byteVector[this->indexOfVector] != ENUM)
@@ -218,7 +283,7 @@ Scope ldapParser::parseScope()
     }
     this->indexIncrement();
 
-    // Enum length should be one TODO check
+    // Enum length should be one 
     this->indexIncrement();
 
     Scope scope;
@@ -240,6 +305,11 @@ Scope ldapParser::parseScope()
     return scope;
 }
 
+/**
+ * @brief Method for parsing boolean.
+ * 
+ * @return bool Boolean.
+ */
 bool ldapParser::parseBoolean()
 {
     if (this->byteVector[this->indexOfVector] != BOOL)
@@ -247,11 +317,11 @@ bool ldapParser::parseBoolean()
         fprintf(stderr, "Wrong BER message!\nExpected BOOLEAN tag!\n");
         exit(1);
     }
-    printf("Boolean: %02x\n", this->byteVector[this->indexOfVector]); // TODO check print
+
+    // Boolean length should be one, skip
     this->indexIncrement();
 
-    printf("Boolean length: %02x\n", this->byteVector[this->indexOfVector]); // TODO check print
-    // Bool length should be one TODO check
+    // Boolean value
     this->indexIncrement();
 
     bool boolean;
@@ -284,17 +354,21 @@ Filters ldapParser::loadFilters()
     int endOfFilter = 0;
     int lengthOfSubstringSequence = 0;
     int endOfSubstringSequence = 0;
-    int indexBeforeSubfilter = 0; // TODO drzi index pred subfilterem
-    int lengthOfSubfilter = 0; // TODO drzi delku subfilteru
+    int indexBeforeSubfilter = 0; 
+    int lengthOfSubfilter = 0; 
     Filters newFilter = Filters();
     switch (this->byteVector[this->indexOfVector])
     {
+        // AND filter
         case 0xa0:
             newFilter.type = AND;
+
+            // Finding end of filter
             this->indexIncrement();
             lengthOfFilter = byteVector[this->indexOfVector];
             endOfFilter = this->indexOfVector + lengthOfFilter;
-            // int indexOfSubFilter = 0; TODO to asi ani neni potreba
+
+            // Loading subfilters
             while (this->indexOfVector < endOfFilter) 
             { 
                 this->indexIncrement();    // Shift to next filter
@@ -312,18 +386,19 @@ Filters ldapParser::loadFilters()
                 }
             }
             break;
+        // OR filter
         case 0xa1:
             newFilter.type = OR;
+
+            // Finding end of filter
             this->indexIncrement();
             lengthOfFilter = byteVector[this->indexOfVector];
             endOfFilter = this->indexOfVector + lengthOfFilter;
             
-            // int indexOfSubFilter = 0; TODO to asi ani neni potreba
+            // Loading subfilters
             while (this->indexOfVector < endOfFilter) 
             { 
-                this->indexIncrement();
-                // printf("Byte %02X\n", this->byteVector[this->indexOfVector]); // TODO check print
-                // printf("Byte delka: %02X\n", this->byteVector[this->indexOfVector + 1]); // TODO check print
+                this->indexIncrement();    // Shift to next filter
                 indexBeforeSubfilter = this->indexOfVector;
                 lengthOfSubfilter = this->byteVector[this->indexOfVector + 1];
                 newFilter.subFilters.push_back(loadFilters());
@@ -339,26 +414,30 @@ Filters ldapParser::loadFilters()
                 }
             }
             break;
+        // NOT filter
         case 0xa2:
             newFilter.type = NOT;
+
+            // Skip length of filter, NOT can have only one subfilter
             this->indexIncrement();
-            lengthOfFilter = byteVector[this->indexOfVector];
-            endOfFilter = this->indexOfVector + lengthOfFilter;
-            // int indexOfSubFilter = 0; TODO to asi ani neni potreba
+
             this->indexIncrement();
-            // TODO mel by tam byt jen jeden 
             newFilter.subFilters.push_back(loadFilters());
             break;
+        // EQUALITY_MATCH filter
         case 0xa3:
             newFilter.type = EQUALITY_MATCH;
-            this->indexIncrement(); // Skip length of substring filter
+            // Skip length of filter
+            this->indexIncrement(); 
             this->indexIncrement();
             newFilter.value.attributeDesc = parseOctetString();
             newFilter.value.assertionValue = parseOctetString();
             break;
+        // SUBSTRINGS filter
         case 0xa4:
             newFilter.type = SUBSTRINGS;
-            this->indexIncrement(); // Skip length of substring filter
+            // Skip length of filter
+            this->indexIncrement(); 
             this->indexIncrement();
             newFilter.substringFilter.type = parseOctetString();
             if (this->byteVector[this->indexOfVector] != SEQUENCE)
@@ -366,6 +445,8 @@ Filters ldapParser::loadFilters()
                 fprintf(stderr, "Wrong BER message!\nExpected SEQUENCE tag!\n");
                 exit(1);
             }
+
+            // Finding end of substring sequence
             this->indexIncrement();
             lengthOfSubstringSequence = this->byteVector[this->indexOfVector];
             endOfSubstringSequence = this->indexOfVector + lengthOfSubstringSequence;
@@ -374,7 +455,8 @@ Filters ldapParser::loadFilters()
             newFilter.substringFilter.substrings.initial = std::string();
             newFilter.substringFilter.substrings.final = std::string();
             newFilter.substringFilter.substrings.any = std::vector<std::string>();
-            // TODO kontrola jestli je vse na svem miste pouze 1x initial, 1x final a final muze byt jen na konci a initial na zacatku
+
+            // Loading substrings
             while (this->indexOfVector < endOfSubstringSequence)
             {
                 switch (this->byteVector[this->indexOfVector])
@@ -398,19 +480,23 @@ Filters ldapParser::loadFilters()
             }
             break;
         default:
-            return newFilter;
+            fprintf(stderr, "Use only AND, OR, NOT, EQUALITY_MATCH or SUBSTRINGS operators!\n");
+            exit(1);
     }
     this->indexIncrement();
 
     return newFilter;
 }
 
+/**
+ * @brief Method for checking length of message.
+ * 
+ */
 void ldapParser::checkLengthOfMessage()
 {
     uint64_t lengthOfTag = this->getLength();
     this->indexOfVector -= 1; // function getLength() increment index of vector
-    printf("\nLength of tag: %ld\n", lengthOfTag);  // TODO check print
-    printf("Length of vector: %d\n", this->maxIndexOfVector - this->indexOfVector);  // TODO check print
+
     if (lengthOfTag != static_cast<u_int64_t>(this->maxIndexOfVector - this->indexOfVector))
     {
         fprintf(stderr, "Wrong BER message!\nLength of Message is not right!");
@@ -418,6 +504,11 @@ void ldapParser::checkLengthOfMessage()
     }
 }
 
+/**
+ * @brief Method for parsing attribute description list.
+ * 
+ * @return std::vector<std::string> Vector of attribute descriptions.
+ */
 std::vector<std::string> ldapParser::parseAttributeDescriptionList()
 {
     std::vector<std::string> attributes;
@@ -426,19 +517,21 @@ std::vector<std::string> ldapParser::parseAttributeDescriptionList()
         fprintf(stderr, "Wrong BER message!\nExpected SEQUENCE tag!\n");
         exit(1);
     }
-    this->indexIncrement();
 
+    this->indexIncrement();
+    // Check if attribute description list is empty
     if (this->byteVector[this->indexOfVector] == 0x00)
     {
         attributes[0] = "";
         return attributes;
     }
 
+    // Finding end of attribute description list
     int lengthOfSequence = this->byteVector[this->indexOfVector];
     int endOfSequence = this->indexOfVector + lengthOfSequence;
     this->indexIncrement();
-    printf("Length of sequence: %02x\n", this->byteVector[this->indexOfVector]); // TODO check print
 
+    // Loading attribute descriptions
     while (this->indexOfVector < endOfSequence)
     {
         attributes.push_back(parseOctetString());
@@ -448,7 +541,7 @@ std::vector<std::string> ldapParser::parseAttributeDescriptionList()
 }
 
 /**
- * @brief Function parse bind request
+ * @brief Method parse bind request
  * 
  */
 void ldapParser::parseBindRequest()
@@ -460,7 +553,6 @@ void ldapParser::parseBindRequest()
     std::string ldapdn = "";
     this->indexIncrement();
 
-    // Check LDAP version TODO
     ldapVersion = this->parseInteger();
     printf("LDAP version: %d\n", ldapVersion); // TODO check print
 
@@ -480,15 +572,14 @@ void ldapParser::parseBindRequest()
         this->indexIncrement();
         if (this->byteVector[this->indexOfVector + 1] == 0x00)
         {
-            printf("Password is empty and thats right!\n"); // TODO check print
         }
-        // TODO kdyz neni prazdny
     }
 }
 
 /**
- * @brief Function parse search request
+ * @brief Method for parsing search request.
  * 
+ * @return SearchRequest Search request.
  */
 SearchRequest ldapParser::parseSearchRequest()
 {
@@ -496,39 +587,34 @@ SearchRequest ldapParser::parseSearchRequest()
 
     // Check length of search request
     this->checkLengthOfMessage();
-    printf("Length of search request: %ld\n", this->getLength()); // TODO check print
-    //this->indexIncrement();
+    this->indexIncrement();
 
     request.ldapdn = this->parseOctetString(); 
     printf("LDAPDN: %s\n", request.ldapdn.c_str()); // TODO check print
-    //this->indexIncrement();
 
     request.scope = this->parseScope();
     printf("Scope: %d\n", request.scope); // TODO check print
     this->indexIncrement();
 
-    // TODO skip aliases
+    // Skip aliases
     this->indexIncrement();
     this->indexIncrement();
     this->indexIncrement();
 
     request.sizeLimit = this->parseInteger();
-    printf("Size limit: %d\n", request.sizeLimit); // TODO check print
-    //this->indexIncrement();
+    printf("Size limit: %d\n", request.sizeLimit);
 
     request.timeLimit = this->parseInteger();
-    printf("Time limit: %d\n", request.timeLimit); // TODO check print
-    //this->indexIncrement();
+    printf("Time limit: %d\n", request.timeLimit);
 
     request.typesOnly = this->parseBoolean();
-    printf("Types only: %d\n", request.typesOnly); // TODO check print
+    printf("Types only: %d\n", request.typesOnly); 
     this->indexIncrement();
-
-    // request.filter = this->parseFilters();
-    // printf("Filter: %02X\n", request.filter); // TODO check print
 
     request.filters = this->loadFilters();
     
+    //this->indexOfVector -= 1;
+    // Load attributes
     if (this->byteVector[this->indexOfVector] == SEQUENCE)
     {
         if (this->byteVector[this->indexOfVector + 1] == 0x00)
@@ -540,15 +626,5 @@ SearchRequest ldapParser::parseSearchRequest()
             request.attributes = this->parseAttributeDescriptionList();
         }
     }
-    
-    // printf("Filters: %02X\n", request.filters.type); // TODO check print
-    // printf("Filters: %02X\n", request.filters.subFilters[0].type); // TODO check print
-    // printf("Filters: %02X\n", request.filters.subFilters[1].type); // TODO check print
-    // printf("Filters: %02X\n", request.filters.subFilters[2].type); // TODO check print
-    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.type.c_str()); // TODO check print
-    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.substrings.any.c_str()); // TODO check print
-    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.substrings.final.c_str()); // TODO check print
-    // printf("Filters: %s\n", request.filters.subFilters[2].substringFilter.substrings.initial.c_str()); // TODO check print
-
     return request;
 }

@@ -1,7 +1,22 @@
+/**
+ * @file server.cpp
+ * @author Filip Polomski, xpolom00
+ * @brief Server file with implementation of TCP server class
+ * @version 1.0
+ * @date 2023-11-20
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include "../include/server.h"
 #include "../include/ldapParser.h"
 #include "../include/LDAP.h"
 
+/**
+ * @brief Construct a new Server:: Server object
+ * 
+ */
 Server::Server()
 {
     this->port = PORT;
@@ -9,8 +24,10 @@ Server::Server()
 }
 
 /**
- * Funtion parse arguments from command line to port and file
+ * @brief Method for parsing arguments
  * 
+ * @param args Number of arguments
+ * @param argv Array of arguments
  */
 void Server::parseArguments(int args, char* argv[])
 {
@@ -49,17 +66,15 @@ void Server::parseArguments(int args, char* argv[])
     }
 }
 
-
+/**
+ * @brief Method for running server and listening for incoming connections
+ * 
+ * @return int 
+ */
 int Server::run()
 {
-
-    // SIGINT handler TODO
-    // signal(SIGINT, &sigintHandler);
-
-    // pak asi predelat ========================================
     int newsocket;
-    int len, msgSize, i;
-    char buffer;
+    int len;
     pid_t pid; long p;      // process ID number (PID)
     struct sigaction sa;    // a signal action when CHILD process is finished
 
@@ -79,7 +94,6 @@ int Server::run()
     socket.createSocket();
 
     struct sockaddr_in6 server;
-    // memset(&server, 0, sizeof(server));
     struct sockaddr_in client;
 
     server.sin6_family = AF_INET6;
@@ -97,6 +111,8 @@ int Server::run()
     printf("* Waiting for incoming connections on port %d (%d)...\n", this->port,server.sin6_port);
 
     len = sizeof(client);
+
+    signal(SIGINT, sigintHandler);
 
     while (1)
     {
@@ -124,14 +140,11 @@ int Server::run()
             fcntl(newsocket, F_SETFL, flags | O_NONBLOCK);
             this->newsocket = newsocket;
 
-
             LDAP ldap(newsocket, this->file);
             ldap.LDAPrun();
 
-            // ldapParser ldapParser(newsocket); TODO delete
-            // ldapParser.LDAPparse();
-            
-            close(newsocket);                          // close the new socket
+            printf("Communication with client finished.\nClosing socket.\n");
+            close(newsocket);                      
             exit(0);   
         }
         else
@@ -147,7 +160,7 @@ int Server::run()
 }
 
 /**
- * Funtion prints usage of program
+ * @brief Method for printing usage of server
  * 
  */
 void Server::printUsage()
@@ -166,13 +179,22 @@ void Server::printUsage()
     exit(0);
 }
 
-// TODO nefunguje spravit pak
-// static void Server::sigintHandler(int signal)
-// {
-//     printf("\n* SIGINT received\n");
-//     exit(signal);
-// }
+/**
+ * @brief Method for handling SIGINT signal
+ * 
+ * @param signal 
+ */
+void Server::sigintHandler(int signal)
+{
+    printf("\n* SIGINT received\n");
+    exit(signal);
+}
 
+/**
+ * @brief Method for checking existence of file
+ * 
+ * @param file input file
+ */
 void Server::checkExistenceOfFile(std::string file)
 {
     std::ifstream inputFile;

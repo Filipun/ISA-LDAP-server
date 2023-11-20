@@ -1,3 +1,14 @@
+/**
+ * @file socket.h
+ * @author Filip Polomski, xpolom00
+ * @brief Socket header file
+ * @version 1.0
+ * @date 2023-11-20
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #ifndef SOCKET_H
 #define SOCKET_H
 

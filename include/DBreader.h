@@ -1,3 +1,14 @@
+/**
+ * @file DBreader.h
+ * @author Filip Polomski
+ * @brief DB reader header file
+ * @version 1.0
+ * @date 2023-11-20
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #ifndef DB_READER_H
 #define DB_READER_H
 
@@ -22,7 +33,9 @@ class DBreader {
         std::string file;
         Line lineSplit(std::string& line);
         FilterReturnType validLineCheck(Line line, Filters filters);
+        std::string stringToLower(std::string str);
     public: 
+        int messageID;
         SearchRequest request; 
         DBreader(SearchRequest request, std::string file);
         std::vector<Line> Run();
