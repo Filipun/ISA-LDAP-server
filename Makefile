@@ -1,6 +1,7 @@
 # @file MakeFile
+# @author Filip Polomski, xpolom00
 # @brief MakeFile for ISA LDAP server project
-# @author Filip Polomski
+# @version 1.0
 # @date 2023-10-5
 
 CC := g++
@@ -13,7 +14,7 @@ SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 
 all: $(SRCS) $(HEADERS)
-		@$(CC) $(FLAGS) $(SRCS) -o isa_ldapserver 
+		@$(CC) $(FLAGS) $(SRCS) -o isa-ldapserver 
 
 clean:
-		@$(RM) -f isa_ldapserver
+		@$(RM) -f isa-ldapserver
